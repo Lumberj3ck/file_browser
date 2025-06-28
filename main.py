@@ -2,6 +2,7 @@ import os
 from pathlib import Path 
 from textual.app import App, ComposeResult
 from textual.widget import Widget
+from textual.reactive import reactive
 from textual.widgets import Header,  Footer, DirectoryTree
 
 class Folder(Widget):
@@ -16,7 +17,7 @@ class StopwatchApp(App):
         ("-", "go_to_parrent_dir", "Go to parrent dir"),
     ]
     background_color = None
-    path = Path(os.getcwd())
+    path = reactive(Path(os.getcwd()))
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -27,13 +28,14 @@ class StopwatchApp(App):
         self.path = self.path.parent
 
     def watch_path(self, new_path):
-        # how to update DirectoryTree widget
-        print("watch path")
-        self.query_one(DirectoryTree).remove()
+        try:
+            self.query_one(DirectoryTree).remove()
 
-        dt = DirectoryTree(self.path)
+            dt = DirectoryTree(new_path)
 
-        self.mount(dt)
+            self.mount(dt)
+        except:
+            print("Failed removing directory tree")
 
     def action_toggle_dark(self) -> None:
         self.theme = (
