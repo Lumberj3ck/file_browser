@@ -34,7 +34,7 @@ Button {
 }
 
 .started{
-    background: $success-muted;
+    background: $len(timers) > 0:success-muted;
     color: $text;
 }
 
