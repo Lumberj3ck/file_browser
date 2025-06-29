@@ -1,51 +1,48 @@
 import os
+import subprocess
 from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.reactive import reactive
-from textual.widgets import Header, Footer, Tree
+from typing import  ClassVar
+from textual.widgets import Header, Footer, Tree, DirectoryTree
+from textual.binding import Binding, BindingType
 
+class FileTree(Tree):
+    ICON_NODE_EXPANDED = "📂 "
+    ICON_NODE = "📁 "
+    ICON_FILE = "📄 "
 
-class StopwatchApp(App):
-    CSS_PATH = "stopwatch.tcss"
-    BINDINGS = [
-        ("d", "toggle_dark", "Toggle dark mode"),
-        ("j", "cursor_down", "Go to down the tree"),
-        ("k", "cursor_up", "Go to up the tree"),
-        ("g", "cursor_to_the_begining", "Move cursor to the begining of tree"),
-        ("G", "cursor_to_the_end", "Move cursor to the end of tree"),
-        ("C", "toggle_node", "Toggle node"),
-        ("-", "go_to_parrent_dir", "Go to parrent dir"),
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("j", "cursor_down", "Go to down the tree"),
+        Binding("k", "cursor_up", "Go to up the tree"),
+        Binding("g", "cursor_to_the_begining", "Move cursor to the begining of tree", show=False),
+        Binding("G", "cursor_to_the_end", "Move cursor to the end of tree", show=False),
+        Binding("E", "reveal_in_explorer", "Reveal current folder in explorer", show=False),
+        Binding("C", "toggle_node", "Toggle node", show=False),
+        Binding("-", "go_to_parrent_dir", "Go to parrent dir", show=False),
+        Binding(".", "make_root_under_cursor", "Make selected folder root", show=False),
     ]
-    background_color = None
-    path = reactive(Path(os.getcwd()))
+    path: reactive = reactive(Path(os.getcwd()))
 
+    def __init__(self):
+        super().__init__(str(""))
 
-    def compose(self) -> ComposeResult:
-        tr: Tree = Tree("Helloo tree")
-        self.tr = tr
-
-        yield Header()
-        yield tr
-        yield Footer()
-    
     def render_tree(self, dir_path, node):
-        if node is not self.tr.root and node.children:
+        if node is not self.root and node.children:
             node.remove_children()
         for item in dir_path.iterdir():
             if item.is_file():
                 node.add_leaf(item.name)
             elif item.is_dir():
                 node.add(item.name, data=os.path.join(dir_path, item.name))
-        if node is self.tr.root:
-            self.tr.root.expand()
+        if node is self.root:
+            self.root.expand()
 
     def on_tree_node_expanded(self, event):
-        print("on_tree_node_expanded event")
         node = event.node
         dir_entry = event.node.data
 
         if not dir_entry:
-            print("Skippedn")
             return
 
         d = Path(dir_entry)
@@ -55,30 +52,52 @@ class StopwatchApp(App):
 
         self.render_tree(d, node)
 
+    def action_make_root_under_cursor(self):
+        if not self.cursor_node:
+            return 
+
+        data = self.cursor_node.data 
+
+        if not data:
+            return 
+        
+        selected_dir = Path(data)
+
+        if not selected_dir.is_dir():
+            return
+
+        
+        self.path = selected_dir
+
 
     def action_go_to_parrent_dir(self):
         self.path = self.path.parent
 
     def watch_path(self):
-        print("On root wathc")
-        self.tr.root.remove_children()
-        self.render_tree(self.path, self.tr.root)
-
-
-    def action_cursor_down(self):
-        self.tr.action_cursor_down()
-
-    def action_cursor_up(self):
-        self.tr.action_cursor_up()
+        self.root.remove_children()
+        self.render_tree(self.path, self.root)
 
     def action_cursor_to_the_begining(self):
-        self.tr.move_cursor(self.tr.root)
+        self.move_cursor(self.root.children[0])
 
     def action_cursor_to_the_end(self):
-        self.tr.move_cursor(self.tr.root.children[-1])
+        self.move_cursor(self.root.children[-1])
+    def action_reveal_in_explorer(self):
+        subprocess.run(["explorer", str(self.path)])
 
-    def action_toggle_node(self):
-        self.tr.action_toggle_node()
+
+class FileBrowser(App):
+    BINDINGS: ClassVar[list[BindingType]] = [
+        Binding("d", "toggle_dark", "Toggle dark mode"),
+    ]
+    background_color = None
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield FileTree()
+        yield Footer()
+    
+
 
     def action_toggle_dark(self) -> None:
         self.theme = (
@@ -87,5 +106,5 @@ class StopwatchApp(App):
 
 
 if __name__ == "__main__":
-    app = StopwatchApp()
+    app = FileBrowser()
     app.run()
