@@ -16,6 +16,8 @@ class StopwatchApp(App):
         ("d", "toggle_dark", "Toggle dark mode"),
         ("j", "cursor_down", "Go to down the tree"),
         ("k", "cursor_up", "Go to up the tree"),
+        ("g", "cursor_to_the_begining", "Move cursor to the begining of tree"),
+        ("G", "cursor_to_the_end", "Move cursor to the end of tree"),
         ("-", "go_to_parrent_dir", "Go to parrent dir"),
     ]
     background_color = None
@@ -57,7 +59,6 @@ class StopwatchApp(App):
                 node.add(item.name, data=os.path.join(dir_entry, item.name))
 
     def action_go_to_parrent_dir(self):
-        # self.path = self.path.parent
         print(self.tr.children)
 
     def action_cursor_down(self):
@@ -66,7 +67,11 @@ class StopwatchApp(App):
     def action_cursor_up(self):
         self.tr.action_cursor_up()
 
-    # def watch_path(self, new_path):
+    def action_cursor_to_the_begining(self):
+        self.tr.move_cursor(self.tr.root)
+
+    def action_cursor_to_the_end(self):
+        self.tr.move_cursor(self.tr.root.children[-1])
 
     def action_toggle_dark(self) -> None:
         self.theme = (
