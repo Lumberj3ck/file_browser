@@ -28,24 +28,3 @@ Button {
 #reset {
     dock: right;
 }
-
-.started DisplayTime{
-    color: $foreground;
-}
-
-.started{
-    background: $len(timers) > 0:success-muted;
-    color: $text;
-}
-
-.started #start {
-    display: none;
-}
-
-.started #reset{
-   visibility: hidden; 
-}
-
-.started #stop {
-    display: block;
-}
