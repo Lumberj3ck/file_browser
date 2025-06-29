@@ -1,13 +1,8 @@
 import os
-from pathlib import Path 
+from pathlib import Path
 from textual.app import App, ComposeResult
-from textual.widget import Widget
 from textual.reactive import reactive
-from textual.widgets import Header,  Footer, DirectoryTree, Tree
-
-class Folder(Widget):
-    """ Will display folder """
-
+from textual.widgets import Header, Footer, Tree
 
 
 class StopwatchApp(App):
@@ -18,48 +13,57 @@ class StopwatchApp(App):
         ("k", "cursor_up", "Go to up the tree"),
         ("g", "cursor_to_the_begining", "Move cursor to the begining of tree"),
         ("G", "cursor_to_the_end", "Move cursor to the end of tree"),
+        ("C", "toggle_node", "Toggle node"),
         ("-", "go_to_parrent_dir", "Go to parrent dir"),
     ]
     background_color = None
     path = reactive(Path(os.getcwd()))
 
+
     def compose(self) -> ComposeResult:
         tr: Tree = Tree("Helloo tree")
         self.tr = tr
-        tr.root.expand()
-        files = tr.root
-
-        for item in self.path.iterdir():
-            if item.is_file():
-                files.add_leaf(item.name)
-            elif item.is_dir():
-                files.add(item.name, data=os.path.join(self.path, item.name))
 
         yield Header()
         yield tr
         yield Footer()
+    
+    def render_tree(self, dir_path, node):
+        if node is not self.tr.root and node.children:
+            node.remove_children()
+        for item in dir_path.iterdir():
+            if item.is_file():
+                node.add_leaf(item.name)
+            elif item.is_dir():
+                node.add(item.name, data=os.path.join(dir_path, item.name))
+        if node is self.tr.root:
+            self.tr.root.expand()
 
     def on_tree_node_expanded(self, event):
         print("on_tree_node_expanded event")
         node = event.node
         dir_entry = event.node.data
+
         if not dir_entry:
-            return 
+            print("Skippedn")
+            return
 
         d = Path(dir_entry)
 
         if not d.exists():
             return
 
-        
-        for item in d.iterdir():
-            if item.is_file():
-                node.add_leaf(item.name)
-            elif item.is_dir():
-                node.add(item.name, data=os.path.join(dir_entry, item.name))
+        self.render_tree(d, node)
+
 
     def action_go_to_parrent_dir(self):
-        print(self.tr.children)
+        self.path = self.path.parent
+
+    def watch_path(self):
+        print("On root wathc")
+        self.tr.root.remove_children()
+        self.render_tree(self.path, self.tr.root)
+
 
     def action_cursor_down(self):
         self.tr.action_cursor_down()
@@ -73,11 +77,14 @@ class StopwatchApp(App):
     def action_cursor_to_the_end(self):
         self.tr.move_cursor(self.tr.root.children[-1])
 
+    def action_toggle_node(self):
+        self.tr.action_toggle_node()
+
     def action_toggle_dark(self) -> None:
         self.theme = (
             "textual-dark" if self.theme == "textual-light" else "textual-light"
         )
-    
+
 
 if __name__ == "__main__":
     app = StopwatchApp()
