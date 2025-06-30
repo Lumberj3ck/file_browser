@@ -3,7 +3,7 @@ from textual.binding import Binding, BindingType
 from typing import  ClassVar
 from textual import work
 from textual.widget import Widget
-from textual.widgets import Static, DataTable
+from textual.widgets import DataTable
 
 class ProcessManager(Widget):
     BINDINGS: ClassVar[list[BindingType]] = [
@@ -69,7 +69,9 @@ class ProcessManager(Widget):
 
         for pid in list(self.cache.keys()):
             if pid not in current:
-                dt.remove_row(self.cache[pid]["row_key"])
+                row_key = self.cache[pid]["row_key"]
+                if row_key in dt._row_locations:
+                    dt.remove_row(row_key)
 
         self.cache = current
     
@@ -85,9 +87,6 @@ class ProcessManager(Widget):
             dt.remove_row(row_key)
         except (psutil.NoSuchProcess, ValueError, PermissionError):
             pass
-
-
-        
 
     def action_cursor_down(self):
         self.query_one(DataTable).action_cursor_down()
