@@ -134,6 +134,7 @@ class FileTree(Tree):
         Binding("b", "add_bookmark", "Add bookmark for current directory", show=False),
         Binding("B", "remove_bookmark", "Remove bookmark for current directory", show=False),
         Binding("f", "show_fuzzy_finder", "Show fuzzy finder for bookmarks", show=False),
+        Binding("d", "delete_selected", "Delete selected file or directory", show=False),
     ]
     path: reactive = reactive(Path(os.getcwd()))
 
@@ -146,7 +147,7 @@ class FileTree(Tree):
             node.remove_children()
         for item in dir_path.iterdir():
             if item.is_file():
-                node.add_leaf(item.name)
+                node.add_leaf(item.name, data=os.path.join(dir_path, item.name))
             elif item.is_dir():
                 bookmark_icon = self.ICON_BOOKMARK if self.bookmark_manager.is_bookmarked(item) else ""
                 node.add(f"{bookmark_icon}{item.name}", data=os.path.join(dir_path, item.name))
@@ -238,8 +239,70 @@ class FileTree(Tree):
     def action_reveal_in_explorer(self):
         subprocess.run(["explorer", str(self.path)])
 
+    def action_delete_selected(self):
+        if not self.cursor_node:
+            return
+        data = self.cursor_node.data
+
+        print(self.cursor_node)
+        if not data:
+            return
+        selected_path = Path(data)
+
+        self.post_message(self.ConfirmDelete(selected_path))
+
     class ShowFuzzyFinder(Message):
         pass
+
+    class ConfirmDelete(Message):
+        def __init__(self, path: Path):
+            super().__init__()
+            self.path = path
+
+class ConfirmDialog(Widget):
+    class Confirmed(Message):
+        def __init__(self, path: Path):
+            super().__init__()
+            self.path = path
+    class Cancelled(Message):
+        pass
+
+    def __init__(self, path: Path):
+        super().__init__()
+        self.path = path
+        self.styles.display = "block"
+        self.styles.position = "absolute"
+        self.styles.top = "40%"
+        self.styles.left = "30%"
+        self.styles.width = "40%"
+        self.styles.background = "#222"
+        self.styles.color = "white"
+        self.styles.border =  ("heavy", "white") 
+        self.styles.padding = (1, 2)
+
+    def compose(self) -> ComposeResult:
+        yield Static(f"Are you sure you want to delete '{self.path.name}'?", id="confirm_text")
+        yield Container(
+            Input(placeholder="Type 'y' for Yes or 'n' for No", id="confirm_input"),
+            id="confirm_input_container"
+        )
+
+    def on_mount(self) -> None:
+        # Focus the input after the widget is mounted
+        input_widget = self.query_one("#confirm_input", Input)
+        input_widget.focus()
+
+    def on_input_submitted(self, event: Input.Submitted):
+        value = event.value.strip().lower()
+        if value == "y":
+            self.post_message(self.Confirmed(self.path))
+            self.remove()
+        elif value == "n":
+            self.post_message(self.Cancelled())
+            self.remove()
+        else:
+            # Optionally clear input or show error
+            event.input.value = ""
 
 class FileBrowser(App):
     BINDINGS: ClassVar[list[BindingType]] = [
@@ -305,6 +368,34 @@ class FileBrowser(App):
         self.query_one(ProcessManager).display = True
         self.query_one(ProcessManager).on_focus()
         self.query_one(ProcessManager).resume_update()
+
+    def on_file_tree_confirm_delete(self, event: FileTree.ConfirmDelete) -> None:
+        # Show confirmation dialog
+        dialog = ConfirmDialog(event.path)
+        self.mount(dialog)
+        # dialog.on_focus()
+        self.confirm_dialog = dialog
+        self.confirm_delete_path = event.path
+
+    def on_confirm_dialog_confirmed(self, event: ConfirmDialog.Confirmed) -> None:
+        path = event.path
+        try:
+            if path.is_file():
+                path.unlink()
+            elif path.is_dir():
+                import shutil
+                shutil.rmtree(path)
+        except Exception as e:
+            pass  # Optionally show error
+        self.query_one(FileTree).refresh_tree()
+        self.confirm_dialog = None
+        self.confirm_delete_path = None
+
+    def on_confirm_dialog_cancelled(self, event: ConfirmDialog.Cancelled) -> None:
+        if hasattr(self, 'confirm_dialog') and self.confirm_dialog:
+            self.confirm_dialog.remove()
+            self.confirm_dialog = None
+            self.confirm_delete_path = None
 
 if __name__ == "__main__":
     app = FileBrowser()
