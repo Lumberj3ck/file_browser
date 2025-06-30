@@ -10,6 +10,7 @@ from textual.containers import Container
 from textual.widget import Widget
 from textual import work
 from textual.message import Message
+from process_manager import ProcessManager
 
 class BookmarkManager:
     def __init__(self):
@@ -243,6 +244,8 @@ class FileTree(Tree):
 class FileBrowser(App):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("d", "toggle_dark", "Toggle dark mode"),
+        Binding("P", "show_process_manager", "Opens process manager"),
+        Binding("F", "show_file_tree", "Show file tree"),
     ]
     background_color = None
 
@@ -254,6 +257,7 @@ class FileBrowser(App):
     def compose(self) -> ComposeResult:
         yield Header()
         yield FileTree(self.bookmark_manager)
+        yield ProcessManager()
         yield Footer()
 
     def on_mount(self) -> None:
@@ -269,6 +273,7 @@ class FileBrowser(App):
         # self.fuzzy_finder.styles.border_title = "Bookmarks"
         # self.fuzzy_finder.styles.z_index = "1000"
         # self.fuzzy_finder.styles.padding = "1 1"
+        self.query_one(ProcessManager).display = False
         self.mount(self.fuzzy_finder)
 
     def on_file_tree_show_fuzzy_finder(self, event: FileTree.ShowFuzzyFinder) -> None:
@@ -276,14 +281,30 @@ class FileBrowser(App):
             self.fuzzy_finder.bookmarks = self.bookmark_manager.get_bookmarks()
             self.fuzzy_finder.show_finder()
 
+    def on_process_manager_show_file_tree(self):
+        self.query_one(FileTree).display = True
+        self.query_one(ProcessManager).display = False
+
     def on_fuzzy_finder_bookmark_selected(self, event: FuzzyFinder.BookmarkSelected) -> None:
         file_tree = self.query_one(FileTree)
         file_tree.path = event.bookmark_path
+
+    def action_show_file_tree(self):
+        self.query_one(FileTree).display = True
+        self.query_one(FileTree).focus()
+        self.query_one(ProcessManager).display = False
+        self.query_one(ProcessManager).stop_update()
 
     def action_toggle_dark(self) -> None:
         self.theme = (
             "textual-dark" if self.theme == "textual-light" else "textual-light"
         )
+
+    def action_show_process_manager(self):
+        self.query_one(FileTree).display = False
+        self.query_one(ProcessManager).display = True
+        self.query_one(ProcessManager).on_focus()
+        self.query_one(ProcessManager).resume_update()
 
 if __name__ == "__main__":
     app = FileBrowser()
