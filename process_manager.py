@@ -38,42 +38,62 @@ class ProcessManager(Widget):
     def get_process_information(self):
         dt = self.query_one(DataTable)
         
-        COLUMNS = ["pid", "name", "username"]
+        COLUMNS = [
+            "pid", "name", "username", "cpu_percent", "memory_percent",
+            "status", "num_threads", "ppid"
+        ]
         
         if not self.cache:
             dt.add_columns(*COLUMNS)
 
         current = {} 
-        for process in psutil.process_iter(COLUMNS):
-            info = process.info
-            current[process.pid] = info
+        for process in psutil.process_iter():
+            try:
+                info = process.as_dict(attrs=COLUMNS)
+                # Format cpu_percent and memory_percent to 1 decimal place
+                info["cpu_percent"] = f"{info.get('cpu_percent', 0):.1f}"
+                info["memory_percent"] = f"{info.get('memory_percent', 0):.1f}"
+                current[process.pid] = info
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
 
         if not self.cache:
             for info in current.values():
-                row_values = [info[col] for col in COLUMNS]
+                row_values = [info.get(col, "") for col in COLUMNS]
                 rk = dt.add_row(*row_values)
                 info["row_key"] = rk
             self.cache = current
             return
 
+        new_cache = {}
+
         for pid, info in current.items():
-            if pid not in self.cache:
-                row_values = [info[col] for col in COLUMNS]
+            if pid in self.cache and "row_key" in self.cache[pid]:
+                # Existing process, preserve row_key
+                info["row_key"] = self.cache[pid]["row_key"]
+                row_key = info["row_key"]
+                for column in COLUMNS:
+                    if (
+                        row_key in dt._row_locations
+                        and column in dt.columns
+                        and info.get(column, "") != self.cache[pid].get(column, "")
+                    ):
+                        dt.update_cell(row_key, column, info.get(column, ""))
+            else:
+                # New process, add row
+                row_values = [info.get(col, "") for col in COLUMNS]
                 rk = dt.add_row(*row_values)
                 info["row_key"] = rk
-            elif info != self.cache[pid]:
-                info["row_key"] = self.cache[pid]["row_key"]
-                for column in COLUMNS:
-                    if info[column] != self.cache[pid][column]:
-                        dt.update_cell(info["row_key"], column, info[column])
+            new_cache[pid] = info
 
+        # Remove rows for processes that have disappeared
         for pid in list(self.cache.keys()):
             if pid not in current:
                 row_key = self.cache[pid]["row_key"]
                 if row_key in dt._row_locations:
                     dt.remove_row(row_key)
 
-        self.cache = current
+        self.cache = new_cache
     
     def action_kill_process(self):
         dt = self.query_one(DataTable)
