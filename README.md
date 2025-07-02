@@ -14,7 +14,7 @@ A terminal-based file browser and process manager built with [Textual](https://g
 
 1. **Clone the repository:**
    ```sh
-   git clone 
+   git clone https://github.com/Lumberj3ck/file_browser.git
    cd file_browser
    ```
 2. **Install dependencies:**
